@@ -68,24 +68,33 @@ class BasicBlock(nn.Module):
 
         return out
 
-def resnet18(pretrained=False, progress=True, **kwargs):
-    # pretrained (bool): If True, returns a model pre-trained on ImageNet
-    # progress (bool): If True, displays a progress bar of the download to stderr
+def resnet18(prev_model=None, pretrained=False, progress=True, **kwargs):
+    r"""ResNet-18 model from
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
+    Args:
+        pretrained (bool): If True, returns a model pre-trained on ImageNet
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """
+    if prev_model is not None:
+        print("new_model_conv_3_1_1: resnet18")
+        print(prev_model.layer2[0].conv1.out_channels)
+    return _resnet('resnet18', BasicBlock, [2, 2, 2, 2], pretrained, progress, prev_model,
+                   **kwargs)	
 
-    
-    return _resnet('resnet18', BasicBlock, [2, 2, 2, 2], pretrained, progress,
-                       **kwargs)	
-
-def _resnet(arch, block, layers, pretrained, progress, **kwargs):
-    model = ResNet(block, layers, **kwargs)
+def _resnet(arch, block, layers, pretrained, progress, prev_model, **kwargs):
+    if prev_model is not None:
+        print("new_model_conv_3_1_1: _resnet")
+        print(prev_model.layer2[0].conv1.out_channels)
+    model = ResNet(block, layers, prev_model, **kwargs)
     if pretrained:
-        state_dict = load_state_dict_from_url(model_urls[arch], progress=progress)
+        state_dict = load_state_dict_from_url(model_urls[arch],
+                                              progress=progress)
         model.load_state_dict(state_dict)
     return model
 
 class ResNet(nn.Module):
     #block = Basicblock, layers=[2,2,2,2]
-    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
+    def __init__(self, block, layers, prev_model, num_classes=1000, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None):
         super(ResNet, self).__init__()
@@ -105,12 +114,12 @@ class ResNet(nn.Module):
         self.drop_rate = 0.0
         self.perf_table = None
         self.num_classes = 1000
-        self.total_cost = 10
+        self.total_cost = 0 # us->s
         #self.num_channels_dict = {}  # dict containing the number of channels remaining for each layer
         self.to_prune = (['conv_2_1_1'] + ['conv_2_2_1']
-                   #+ ['conv_3_1_1'] + ['conv_3_2_1']
-                   #+ ['conv_4_1_1'] + ['conv_4_2_1']
-                   #+ ['conv_5_1_1'] + ['conv_5_2_1']
+                   + ['conv_3_1_1'] + ['conv_3_2_1']
+                   + ['conv_4_1_1'] + ['conv_4_2_1']
+                   + ['conv_5_1_1'] + ['conv_5_2_1']
 			       )
 		
         if replace_stride_with_dilation is None:
@@ -127,15 +136,19 @@ class ResNet(nn.Module):
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, layers[0], layer_id=1)
+        if prev_model is not None:
+            print("new_model_conv_3_1_1 out channels: ResNet")
+            print(prev_model.layer2[0].conv1.out_channels)
+        self.layer1 = self._make_layer(block, 64, layers[0], prev_model=prev_model, layer_id=1)
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2,
-                                       dilate=replace_stride_with_dilation[0], layer_id=2)
+                                       dilate=replace_stride_with_dilation[0], prev_model=prev_model, layer_id=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2,
-                                       dilate=replace_stride_with_dilation[1], layer_id=3)
+                                       dilate=replace_stride_with_dilation[1], prev_model=prev_model, layer_id=3)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-                                       dilate=replace_stride_with_dilation[2], layer_id=4)
+                                       dilate=replace_stride_with_dilation[2], prev_model=prev_model, layer_id=4)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = nn.Linear(512 * block.expansion, num_classes) if prev_model is None else \
+		    nn.Linear(prev_model.fc.in_features, self.num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -158,7 +171,7 @@ class ResNet(nn.Module):
     # block=BasicBlock(in "make_subnetwork" for loop), 
 	# planes=self.n_channels[x], blocks=n_blocks_per_subnet,
 	# stride=stride, dilate=???, layer_id=1~4
-    def _make_layer(self, block, planes, blocks, layer_id, stride=1, dilate=False):
+    def _make_layer(self, block, planes, blocks, prev_model, layer_id, stride=1, dilate=False):
         norm_layer = self._norm_layer
         downsample = None
         previous_dilation = self.dilation
@@ -172,23 +185,39 @@ class ResNet(nn.Module):
             )
 
         layers = []
+        if prev_model is not None: #prev_model.layer1[0].conv1.in_channels
+            #layer_name = f"layer{layer_id}"
+            #inplanes_prev = getattr(prev_model, layer_name)[0].conv1.out_channels
+            #print(f"layername {layer_id}  inplanes_prev {inplanes_prev}")
+            # small block 1
+            # I should add some constraint there since a basicblock may be disappeared during process.
+            layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
+                                self.base_width, previous_dilation, norm_layer, prev_model=prev_model))
+            # inplanes = 64, 64, 128, 256
+            #print(f'Inplanes before 1st small block = {self.inplanes}')
+            self.inplanes = planes * block.expansion
+            #print(f'Inplanes after 1st small block = {self.inplanes}')
+            # small block 2~N
+            for _ in range(1, blocks): # blocks = 2 if resnet18
+                layers.append(block(self.inplanes, planes, groups=self.groups,
+                                    base_width=self.base_width, dilation=self.dilation,
+                                    norm_layer=norm_layer, prev_model=prev_model))
         
-        #layer_name = f"layer{layer_id}"
-        #inplanes_prev = getattr(prev_model, layer_name)[0].conv1.out_channels
-        #print(f"layername {layer_id}  inplanes_prev {inplanes_prev}")
-        # small block 1
-        # I should add some constraint there since a basicblock may be disappeared during process.
-        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, norm_layer))
-        # inplanes = 64, 64, 128, 256
-        #print(f'Inplanes before 1st small block = {self.inplanes}')
-        self.inplanes = planes * block.expansion
-        #print(f'Inplanes after 1st small block = {self.inplanes}')
-        # small block 2~N
-        for _ in range(1, blocks): # blocks = 2 if resnet18
-            layers.append(block(self.inplanes, planes, groups=self.groups,
-                                base_width=self.base_width, dilation=self.dilation,
-                                norm_layer=norm_layer))
+        else:
+            # raise Exception('Prev_layer has not been dealed with.')
+            # small block 1
+            layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
+                                self.base_width, previous_dilation, norm_layer))
+            # inplanes = 64, 64, 128, 256
+            #print(f'Inplanes before 1st small block = {self.inplanes}')
+            self.inplanes = planes * block.expansion
+            #print(f'Inplanes after 1st small block = {self.inplanes}')
+            # small block 2~N
+            for _ in range(1, blocks): # blocks = 2 if resnet18
+                layers.append(block(self.inplanes, planes, groups=self.groups,
+                                    base_width=self.base_width, dilation=self.dilation,
+                                    norm_layer=norm_layer))
+
         return nn.Sequential(*layers)
 
     def _forward_impl(self, x):
@@ -211,7 +240,20 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         return self._forward_impl(x)
+    '''
+    def load_bigger_state_dict(self, state_dict):
+        """used to load a state dict that contains unused parameters (this is needed because when a layer is pruned away
+        completely self.layer = None, it is not removed from state_dict, taken from
+        https://discuss.pytorch.org/t/how-to-load-part-of-pre-trained-model/1113"""
+        model_dict = self.state_dict()
 
+        # 1. filter out unnecessary keys(i.e. pruned channels will not be recorded in pretrained_dict)
+        pretrained_dict = {k: v for k, v in state_dict.items() if k in model_dict}
+        # 2. overwrite entries in the existing state dict
+        model_dict.update(pretrained_dict)
+        # 3. load the new state dict
+        self.load_state_dict(pretrained_dict)
+    '''
     def choose_num_channels(self, layer_name, cost_red_obj, allow_small_prunings):
         """chooses how many channels to remove
         :param layer_name: layer at which we remove channels
@@ -219,6 +261,7 @@ class ResNet(nn.Module):
         :param allow_small_prunings: allows to prune layers for which we cannot achieve the reduction objective
         :returns: the number of channels to prune and achieved cost reduction or None, None if (we cannot achieve
         cost_red_obj and allow_small_prunings is set to False) or the Layer was pruned away"""
+        #print(f"now_red_obj:{cost_red_obj}")
         layer = self.layer1[0].conv2
         if layer_name == 'conv_2_1_1':
             layer = self.layer1[0].conv1
@@ -285,7 +328,7 @@ class ResNet(nn.Module):
 
         self._compute_total_cost()
 
-        print(f"the total cost of the model is: {self.total_cost :.2f}s according to the perf table")
+        print(f"the total cost of the model is: {self.total_cost/1000000 :.3f}s according to the perf table")
 
     def _get_cost_array(self, layer_name):
         """returns the costs array corresponding to the layer named laryer_name, the difference between cost_array[a]
@@ -354,6 +397,8 @@ class ResNet(nn.Module):
         """ get the cost of layer layer_name when it has in_channel and out_channel channels, None means we return all
         input channels"""
         #print(f'layer_name = {layer_name}  in_channel = {in_channel}  out_channel = {out_channel}')
+        ''' 
+        # create fake table code
         if in_channel is None:
             if out_channel is None:
                 return 0#self.perf_table[layer_name][:, :]
@@ -365,6 +410,17 @@ class ResNet(nn.Module):
             return [i/(4 ** int(layer_name[-1])) for i in range(max_out)]#self.perf_table[layer_name][in_channel - 1, :]
         else:
             return 2#self.perf_table[layer_name][in_channel - 1, out_channel - 1]
+        '''
+        #print(f'layer_name = {layer_name}  in_channel = {in_channel}  out_channel = {out_channel}')
+        if in_channel is None:
+            if out_channel is None:
+                return self.perf_table[layer_name][:, :]
+            else:
+                return self.perf_table[layer_name][:, out_channel - 1]
+        elif out_channel is None:
+            return self.perf_table[layer_name][in_channel - 1, :]
+        else:
+            return self.perf_table[layer_name][in_channel - 1, out_channel - 1]
 
     def _compute_total_cost(self):
         """computes the total cost of the network by adding the costs of the channels in the perf_table"""
@@ -423,6 +479,7 @@ class ResNet(nn.Module):
                         layer_name_table = f"No_Stride_{int(layer_name[5])-1}"
 
                     self.total_cost += self.get_cost(layer_name_table, layer.in_channels, layer.out_channels)
+        self.total_cost = self.total_cost #/ (10**6)
                     # initially, the layers of the same type in the same subnetwork have the same number of channels
 
     def remove_from_in_channels(self, layer_name, remaining_channels):

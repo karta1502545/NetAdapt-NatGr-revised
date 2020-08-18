@@ -7,7 +7,6 @@ import warnings
 
 import torch
 import torch.nn as nn
-import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 import torch.optim
@@ -28,7 +27,7 @@ from functools import partial
 parser = argparse.ArgumentParser(description='PyTorch ImageNet')
 parser.add_argument('--training', default=False, help='True for training')
 parser.add_argument('--pruning_fact', default=0.3, type=float, help="proportion of inference time that will approx be pruned away")
-parser.add_argument('--perf_table', default='res-40-2-tf-lite-rasberry-pi', type=str, help='the perf_table (assumed to be in perf_tables '
+parser.add_argument('--perf_table', default='resnet18_table', type=str, help='the perf_table (assumed to be in perf_tables '
                                                                        'folders and without the extension)')
 parser.add_argument('--net', default='res', type=str, help='network architecture')
 parser.add_argument('--init_red_fact', default=10, type=int,
@@ -66,12 +65,12 @@ parser.add_argument('-b', '--batch-size', default=256, type=int,
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--lr', '--learning-rate', default=0, type=float,
+parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 
-parser.add_argument('-p', '--print-freq', default=195, type=int,
+parser.add_argument('-p', '--print-freq', default=500, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
@@ -105,7 +104,7 @@ args = parser.parse_args()
 #pruning code
 
 model, full_train_loader, val_loader = main(parser)
-model = torch.load('pruned_model11.pth')
+#model = torch.load('pruned_model10.pth')
 
 if args.evaluate:
     model_list = []
@@ -149,24 +148,6 @@ if __name__ == '__main__':
             #validate(val_loader, a_model, criterion, args)
         validate(val_loader, model, criterion, args)
         exit()
-    '''
-    ### training code ### not sure if it works properly (learning rate=?)
-    ### Get a model of lower accuracy after training 2020/8/13
-    if args.training:
-        for epoch in range(args.start_epoch, args.epochs):
-            adjust_learning_rate(optimizer, epoch, args)
-            # train for one epoch # use smaller_training_set to speed up testing process
-            train(train_loader, model, criterion, optimizer, epoch, args)
-            # evaluate on validation set
-            acc1 = validate(val_loader, model, criterion, args)
-            # remember best acc@1 and save checkpoint
-            is_best = acc1 > best_acc1
-            best_acc1 = max(acc1, best_acc1)
-        print(f'best_acc1 = {best_acc1}')
-        torch.save(model, 'trained_model.pth')
-        validate(val_loader, model, criterion, args)
-        exit()
-    '''
     #prune_history.append(None)
     #table_costs_history.append(model.total_cost)
     #error_history.append(validate(val_loader, model, criterion, args))
@@ -180,7 +161,7 @@ if __name__ == '__main__':
     while model.total_cost > red_objective:
 
         i = i + 1
-        print(f"Pruning step number {step_number} -- target_gains are {target_gains}s:")
+        print(f"Pruning step number {step_number} -- target_gains are {target_gains/1000000 :.4f}s:")
         # Prune
         best_network, best_error, best_gains, pruned_layer, number_pruned = None, None, None, None, None
 
@@ -212,11 +193,12 @@ if __name__ == '__main__':
 
             new_error = validate(val_loader, new_model, criterion, args)
 
-            delta_error = new_error - prev_holdout_error
-            relative_delta_error = delta_error / new_gains
+            #delta_error = new_error - prev_holdout_error # orgin: negative number
+            delta_error = prev_holdout_error - new_error # positive number
+            relative_delta_error = delta_error / (new_gains/1000000)
 
             print(f"layer {layer} \t channels pruned {new_num_channels_pruned} \t error increase {delta_error :.2f} \t "
-                  f"predicted gains {new_gains :.4f} \t ratio {relative_delta_error :.2f}\n")
+                  f"predicted gains {new_gains/1000000 :.4f} \t ratio {relative_delta_error :.2f}\n")
 
             prev_ratio = ((best_error - prev_holdout_error) / best_gains) if best_error is not None else 0
 
@@ -232,7 +214,7 @@ if __name__ == '__main__':
         if best_network is None:
             raise Exception('We could not find a single layer to prune')
         print(f"the best validation error achieved was of {best_error} for layer {pruned_layer};"
-              f" {number_pruned} channels were pruned; inference time gains of {best_gains :.4f}s")
+              f" {number_pruned} channels were pruned; inference time gains of {best_gains/1000000 :.4f}s")
         torch.cuda.empty_cache()  # frees GPU memory to avoid running out of ram
         best_network.to(device)
         model = best_network
@@ -240,7 +222,7 @@ if __name__ == '__main__':
         example = torch.rand(1, 3, 224, 224).cuda()
         traced_script_module = torch.jit.trace(model, example)
         traced_script_module.save(f"traced_model{i}.pt")
-        #torch.save(model, f'pruned_model{i}.pth')
+        torch.save(model, f'pruned_model{i}.pth')
         ###
         prev_holdout_error = best_error
 
@@ -255,7 +237,7 @@ if __name__ == '__main__':
         target_gains *= args.decay_rate
         
 
-    print(f"pruned network inference time according to perf_table: {model.total_cost :.4f}")
+    print(f"pruned network inference time according to perf_table: {model.total_cost/1000000 :.4f}s")
 
     # long term fine tune
     if args.long_term_fine_tune != 0:
@@ -267,7 +249,7 @@ if __name__ == '__main__':
         table_costs_history.append(table_costs_history[-1])
     print("finish pruning")
     # Save
-    #torch.save(model, 'pruned_model_final.pth')
+    torch.save(model, 'pruned_model_final.pth')
     '''
     filename = os.path.join('checkpoints', f'{args.save_file}.pth')
     torch.save({

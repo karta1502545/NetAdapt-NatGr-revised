@@ -138,15 +138,15 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
 def validate(val_loader, model, criterion, args):
     #print(val_loader)
-    n_batch = 1
+    #n_batch = 1
     print('from training_functions.py line265:')
-    print(f'n_batch={n_batch}')
+    #print(f'n_batch={n_batch}')
     batch_time = AverageMeter('Time', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(
-        n_batch,
+        len(val_loader),
         [batch_time, losses, top1, top5],
         prefix='Test: ')
 
@@ -156,8 +156,8 @@ def validate(val_loader, model, criterion, args):
     with torch.no_grad():
         end = time.time()
         for i, (images, target) in enumerate(val_loader):
-            if i >= n_batch:
-                break
+            #if i >= n_batch:
+                #break
             if args.gpu is not None:
                 images = images.cuda(args.gpu, non_blocking=True)
             if torch.cuda.is_available():

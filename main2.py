@@ -71,7 +71,7 @@ parser.add_argument('--epochs', default=90, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=1, type=int,
+parser.add_argument('-b', '--batch-size', default=256, type=int,
                     metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
@@ -81,7 +81,7 @@ parser.add_argument('--lr', '--learning-rate', default=0.1, type=float,
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 
-parser.add_argument('-p', '--print-freq', default=10, type=int,
+parser.add_argument('-p', '--print-freq', default=100, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
@@ -113,8 +113,15 @@ if not os.path.exists('nbr_channels'):
     os.makedirs('nbr_channels')
 args = parser.parse_args()
 
+if args.evaluate:
+    model_list = []
+    for i in range(1, 12):
+        tmp = torch.load(f'pruned_model{i}.pth')
+        model_list.append(tmp)
+    model_list.append(torch.load('pruned_model_final.pth'))
+
 val_loader = main(parser)
-model = torch.load('model.pth')
+#model = torch.load('pruned_model_final.pth')
 
 error_history = []
 prune_history = []
@@ -124,11 +131,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD([v for v in model.parameters() if v.requires_grad],
-                                lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     ### validation code ###
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        number_of_iter = 1
+        for i, model in enumerate(model_list):
+            print(f'number_of_iter:{i}')
+            validate(val_loader, model, criterion, args)
 
     # Save
     #torch.save(model, 'model.pth')
