@@ -93,15 +93,11 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
-
-if not os.path.exists('checkpoints'):
-    os.makedirs('checkpoints')
+'''
 if not os.path.exists('nbr_channels'):
     os.makedirs('nbr_channels')
+'''
 args = parser.parse_args()
-
-
-#pruning code
 
 model, full_train_loader, val_loader = main(parser)
 #model = torch.load('pruned_model10.pth')
