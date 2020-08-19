@@ -1,0 +1,98 @@
+prune.py 99: total_cost由wideresnet.py的compute_total_cost得來，有牽涉到Network Structure（layer名稱）
+prune.py 120: model.choose_num_channels要輸入layer_name, 且內部有_get_cost_array會用到perf_table以及layer名稱
+wideresnet.py 201 choose_which_channels: _get_pruning_score(layer_name)有特別對"Conv_x_0_2"操作(第二層有些被砍掉,不清楚如何銜接上下層)
+wideresnet.py 206 choose_which_channels: 做torch.sort,不太確定作用是什摸
+Wideresnet.py 256~259: 砍掉整層的條件看不太懂
+
+
+
+
+
+
+
+
+
+
+
+
+Origin
+  (Skip_2): Conv2d(32, 64, kernel_size=(1, 1), stride=(2, 2), bias=False)
+  (Conv_2_0_1): Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+  (Conv_2_0_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_0_1_relu): ReLU(inplace)
+  (Conv_2_0_2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_0_2_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_0_2_relu): ReLU(inplace)
+  (Conv_2_1_1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_1_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_1_1_relu): ReLU(inplace)
+  (Conv_2_1_2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_1_2_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_1_2_relu): ReLU(inplace)
+  (Conv_2_2_1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_2_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_2_1_relu): ReLU(inplace)
+  (Conv_2_2_2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_2_2_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_2_2_relu): ReLU(inplace)
+  (Conv_2_3_1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_3_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_3_1_relu): ReLU(inplace)
+  (Conv_2_3_2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_3_2_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_3_2_relu): ReLU(inplace)
+  (Conv_2_4_1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_4_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_4_1_relu): ReLU(inplace)
+  (Conv_2_4_2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_4_2_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_4_2_relu): ReLU(inplace)
+  (Conv_2_5_1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_5_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_5_1_relu): ReLU(inplace)
+  (Conv_2_5_2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+  (Conv_2_5_2_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_5_2_relu): ReLU(inplace)
+  (Skip_3): Conv2d(64, 128, kernel_size=(1, 1), stride=(2, 2), bias=False)
+  
+    (Skip_2): Conv2d(32, 39, kernel_size=(1, 1), stride=(2, 2), bias=False) 				# output changed
+  (Conv_2_0_1): Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)	
+  (Conv_2_0_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_0_1_relu): ReLU(inplace)
+  (Conv_2_0_2): Conv2d(64, 39, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# output changed
+  (Conv_2_0_2_bn): BatchNorm2d(39, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)	# BN changed
+  (Conv_2_0_2_relu): ReLU(inplace)
+  (Conv_2_1_1): Conv2d(39, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# input changed
+  (Conv_2_1_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_1_1_relu): ReLU(inplace)
+  (Conv_2_1_2): Conv2d(64, 39, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# output changed
+  (Conv_2_1_2_bn): BatchNorm2d(39, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)	# BN changed
+  (Conv_2_1_2_relu): ReLU(inplace)
+  (Conv_2_2_1): Conv2d(39, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# input changed
+  (Conv_2_2_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_2_1_relu): ReLU(inplace)
+  (Conv_2_2_2): Conv2d(64, 39, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# output changed
+  (Conv_2_2_2_bn): BatchNorm2d(39, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)	# BN changed
+  (Conv_2_2_2_relu): ReLU(inplace)
+  (Conv_2_3_1): Conv2d(39, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# input changed
+  (Conv_2_3_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_3_1_relu): ReLU(inplace)
+  (Conv_2_3_2): Conv2d(64, 39, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# output changed
+  (Conv_2_3_2_bn): BatchNorm2d(39, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)	# BN changed
+  (Conv_2_3_2_relu): ReLU(inplace)
+  (Conv_2_4_1): Conv2d(39, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# input changed
+  (Conv_2_4_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_4_1_relu): ReLU(inplace)
+  (Conv_2_4_2): Conv2d(64, 39, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# output changed
+  (Conv_2_4_2_bn): BatchNorm2d(39, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)	# BN changed
+  (Conv_2_4_2_relu): ReLU(inplace)
+  (Conv_2_5_1): Conv2d(39, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# input changed
+  (Conv_2_5_1_bn): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+  (Conv_2_5_1_relu): ReLU(inplace)
+  (Conv_2_5_2): Conv2d(64, 39, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	# output changed
+  (Conv_2_5_2_bn): BatchNorm2d(39, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)	# BN changed
+  (Conv_2_5_2_relu): ReLU(inplace)
+  (Skip_3): Conv2d(39, 128, kernel_size=(1, 1), stride=(2, 2), bias=False)				# input changed
+
+
+

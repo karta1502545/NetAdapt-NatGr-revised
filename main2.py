@@ -121,8 +121,13 @@ if args.evaluate:
     model_list.append(torch.load('pruned_model_final.pth'))
 
 val_loader = main(parser)
-#model = torch.load('pruned_model_final.pth')
-
+model = torch.load('pruned_model1.pth')
+def get_parameter_number(net):
+    total_num = sum(p.numel() for p in net.parameters())
+    trainable_num = sum(p.numel() for p in net.parameters() if p.requires_grad)
+    return {'Total': total_num, 'Trainable': trainable_num}
+print(f"Get parameter number: {get_parameter_number(model)}")
+exit(0)
 error_history = []
 prune_history = []
 table_costs_history = []

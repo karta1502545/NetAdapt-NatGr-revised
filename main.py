@@ -17,8 +17,10 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
+
 # add by Bobby.
 import copy
+from pandas import DataFrame
 from training_functions import *
 from resnet18 import *
 from functools import partial
@@ -93,6 +95,17 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
+
+data={
+    'acc1':[],
+    'pruned_layer_name':[],
+    'num_of_pruned_channels':[],
+    'target_gains':[],
+    'gains':[],
+    'rem_total_param':[],
+    'rem_trainable_param':[],
+}
+
 '''
 if not os.path.exists('nbr_channels'):
     os.makedirs('nbr_channels')
@@ -114,7 +127,7 @@ error_history = []
 prune_history = []
 table_costs_history = []
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
 #model.to(device)
 model.load_table(os.path.join("perf_tables", f"{args.perf_table}.pickle"))
 
@@ -132,7 +145,7 @@ train_dataset = datasets.ImageFolder(
         normalize,
     ]))
 # dataset split into train/holdout set
-train_loader, holdout_loader = get_train_holdout(args.data, args.workers, args.batch_size, args.holdout_prop, args)
+#train_loader, holdout_loader = get_train_holdout(args.data, args.workers, args.batch_size, args.holdout_prop, args)
 
 if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
@@ -149,11 +162,25 @@ if __name__ == '__main__':
     #error_history.append(validate(val_loader, model, criterion, args))
     # validate on holdout so that we can compute the error change after having pruned one layer
     prev_holdout_error = validate(val_loader, model, criterion, args)
+    
+    ### record initial model performance
+    # Find total parameters and trainable parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    total_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    data['pruned_layer_name'].append('None')
+    data['acc1'].append(prev_holdout_error.cpu().numpy())
+    data['target_gains'].append(0)
+    data['gains'].append(0)
+    data['num_of_pruned_channels'].append(0)
+    data['rem_total_param'].append(total_params)
+    data['rem_trainable_param'].append(total_trainable_params)
+    ###
     red_objective = (1 - args.pruning_fact) * model.total_cost
     target_gains = args.pruning_fact * model.total_cost / args.init_red_fact  # gains at first epoch to achieve the
     # objective
     step_number = 1
     i = 0 # for saving model in pruning process
+
     while model.total_cost > red_objective:
 
         i = i + 1
@@ -185,6 +212,7 @@ if __name__ == '__main__':
 
             optimizer = torch.optim.SGD([v for v in new_model.parameters() if v.requires_grad],
                                         lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
+
             finetune(new_model, optimizer, criterion, args.short_term_fine_tune, full_train_loader, layer, device)
 
             new_error = validate(val_loader, new_model, criterion, args)
@@ -216,9 +244,22 @@ if __name__ == '__main__':
         model = best_network
         ### create file to see # of remaining channels
         example = torch.rand(1, 3, 224, 224).cuda()
-        traced_script_module = torch.jit.trace(model, example)
-        traced_script_module.save(f"traced_model{i}.pt")
+        #traced_script_module = torch.jit.trace(model, example)
+        #traced_script_module.save(f"traced_model{i}.pt")
         torch.save(model, f'pruned_model{i}.pth')
+        # Find total parameters and trainable parameters
+        total_params = sum(p.numel() for p in model.parameters())
+        total_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        ### record pruning process
+        data['pruned_layer_name'].append(pruned_layer[5:])
+        data['acc1'].append(best_error.cpu().numpy())
+        data['target_gains'].append(f'{target_gains/1000000 :.4f}')
+        data['gains'].append(f'{best_gains/1000000 :.4f}')
+        data['num_of_pruned_channels'].append(number_pruned)
+        data['rem_total_param'].append(total_params)
+        data['rem_trainable_param'].append(total_trainable_params)
+        df=DataFrame.from_dict(data, orient='index')
+        df.to_excel('prune_result.xlsx')
         ###
         prev_holdout_error = best_error
 
@@ -245,7 +286,12 @@ if __name__ == '__main__':
         table_costs_history.append(table_costs_history[-1])
     print("finish pruning")
     # Save
-    torch.save(model, 'pruned_model_final.pth')
+    #torch.save(model, 'pruned_model_final.pth')
+    
+    ### record long_term_fine_tune result
+    data['acc1'].append(best_error.cpu().numpy())
+    df=DataFrame.from_dict(data, orient='index')
+    df.to_excel('prune_result.xlsx')
     '''
     filename = os.path.join('checkpoints', f'{args.save_file}.pth')
     torch.save({
