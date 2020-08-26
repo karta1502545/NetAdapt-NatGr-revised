@@ -106,14 +106,11 @@ data={
     'rem_trainable_param':[],
 }
 
-'''
-if not os.path.exists('nbr_channels'):
-    os.makedirs('nbr_channels')
-'''
+
 args = parser.parse_args()
 
 model, full_train_loader, val_loader = main(parser)
-#model = torch.load('pruned_model10.pth')
+#model = torch.load('pruned_model_final.pth')
 
 if args.evaluate:
     model_list = []
@@ -122,13 +119,8 @@ if args.evaluate:
         model_list.append(tmp)
     
 
-
-error_history = []
-prune_history = []
-table_costs_history = []
-
 device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
-#model.to(device)
+model.to(device)
 model.load_table(os.path.join("perf_tables", f"{args.perf_table}.pickle"))
 
 print('==> Preparing data..')
@@ -144,8 +136,6 @@ train_dataset = datasets.ImageFolder(
         transforms.ToTensor(),
         normalize,
     ]))
-# dataset split into train/holdout set
-#train_loader, holdout_loader = get_train_holdout(args.data, args.workers, args.batch_size, args.holdout_prop, args)
 
 if __name__ == '__main__':
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
@@ -157,9 +147,6 @@ if __name__ == '__main__':
             #validate(val_loader, a_model, criterion, args)
         validate(val_loader, model, criterion, args)
         exit()
-    #prune_history.append(None)
-    #table_costs_history.append(model.total_cost)
-    #error_history.append(validate(val_loader, model, criterion, args))
     # validate on holdout so that we can compute the error change after having pruned one layer
     prev_holdout_error = validate(val_loader, model, criterion, args)
     
@@ -259,12 +246,12 @@ if __name__ == '__main__':
         data['rem_total_param'].append(total_params)
         data['rem_trainable_param'].append(total_trainable_params)
         df=DataFrame.from_dict(data, orient='index')
-        df.to_excel('prune_result.xlsx')
+        #df.to_excel('prune_result.xlsx')
         ###
         prev_holdout_error = best_error
 
         prune_history.append((pruned_layer, number_pruned))
-        table_costs_history.append(model.total_cost)
+        #table_costs_history.append(model.total_cost)
 
         # evaluate on validation set
         #error_history.append(validate(model, val_loader, criterion, device, memory_leak=True))
@@ -282,27 +269,13 @@ if __name__ == '__main__':
                                     lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
         finetune(model, optimizer, criterion, args.long_term_fine_tune, full_train_loader, "", device)
         #error_history.append(validate(val_loader, model, criterion, args))
-        prune_history.append(None)
-        table_costs_history.append(table_costs_history[-1])
+        #prune_history.append(None)
+        #table_costs_history.append(table_costs_history[-1])
     print("finish pruning")
     # Save
-    #torch.save(model, 'pruned_model_final.pth')
+    torch.save(model, 'pruned_model_final.pth')
     
     ### record long_term_fine_tune result
-    data['acc1'].append(best_error.cpu().numpy())
+    data['acc1'].append(validate(val_loader, new_model, criterion, args).cpu().numpy())
     df=DataFrame.from_dict(data, orient='index')
-    df.to_excel('prune_result.xlsx')
-    '''
-    filename = os.path.join('checkpoints', f'{args.save_file}.pth')
-    torch.save({
-        'epoch': step_number,
-        'state_dict': model.state_dict(),
-        'error_history': error_history,
-        'prune_history': prune_history,
-        'table_costs_history': table_costs_history,
-    }, filename)
-
-    filename2 = os.path.join('nbr_channels', f'{args.save_file}.pickle')
-    with open(filename2, 'wb') as file:
-        pickle.dump(model.num_channels_dict, file)
-    '''
+    #df.to_excel('prune_result.xlsx')

@@ -113,14 +113,7 @@ if not os.path.exists('nbr_channels'):
 args = parser.parse_args()
 
 model, full_train_loader, val_loader = main(parser)
-#model = torch.load('pruned_model10.pth')
-
-if args.evaluate:
-    model_list = []
-    for i in range(1, 12):
-        tmp = torch.load(f'pruned_model{i}.pth')
-        model_list.append(tmp)
-    
+model = torch.load('pruned_model22.pth')
 
 
 error_history = []
@@ -128,7 +121,7 @@ prune_history = []
 table_costs_history = []
 
 device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
-#model.to(device)
+model.to(device)
 model.load_table(os.path.join("perf_tables", f"{args.perf_table}.pickle"))
 
 print('==> Preparing data..')
@@ -259,7 +252,7 @@ if __name__ == '__main__':
         data['rem_total_param'].append(total_params)
         data['rem_trainable_param'].append(total_trainable_params)
         df=DataFrame.from_dict(data, orient='index')
-        df.to_excel('prune_result.xlsx')
+        #df.to_excel('prune_result.xlsx')
         ###
         prev_holdout_error = best_error
 
@@ -281,28 +274,13 @@ if __name__ == '__main__':
         optimizer = torch.optim.SGD([v for v in model.parameters() if v.requires_grad],
                                     lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
         finetune(model, optimizer, criterion, args.long_term_fine_tune, full_train_loader, "", device)
-        #error_history.append(validate(val_loader, model, criterion, args))
-        prune_history.append(None)
-        table_costs_history.append(table_costs_history[-1])
+        # Save
+        torch.save(model, 'pruned_model_final.pth')
+        validate(val_loader, model, criterion, args)
     print("finish pruning")
-    # Save
-    #torch.save(model, 'pruned_model_final.pth')
+
     
     ### record long_term_fine_tune result
-    data['acc1'].append(best_error.cpu().numpy())
+    data['acc1'].append(validate(val_loader, model, criterion, args).cpu().numpy())
     df=DataFrame.from_dict(data, orient='index')
     df.to_excel('prune_result.xlsx')
-    '''
-    filename = os.path.join('checkpoints', f'{args.save_file}.pth')
-    torch.save({
-        'epoch': step_number,
-        'state_dict': model.state_dict(),
-        'error_history': error_history,
-        'prune_history': prune_history,
-        'table_costs_history': table_costs_history,
-    }, filename)
-
-    filename2 = os.path.join('nbr_channels', f'{args.save_file}.pickle')
-    with open(filename2, 'wb') as file:
-        pickle.dump(model.num_channels_dict, file)
-    '''

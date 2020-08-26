@@ -113,22 +113,14 @@ if not os.path.exists('nbr_channels'):
 args = parser.parse_args()
 
 model, full_train_loader, val_loader = main(parser)
-#model = torch.load('pruned_model10.pth')
-
-if args.evaluate:
-    model_list = []
-    for i in range(1, 12):
-        tmp = torch.load(f'pruned_model{i}.pth')
-        model_list.append(tmp)
-    
-
+model = torch.load('pruned_model_final.pth')
 
 error_history = []
 prune_history = []
 table_costs_history = []
 
 device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
-#model.to(device)
+model.to(device)
 model.load_table(os.path.join("perf_tables", f"{args.perf_table}.pickle"))
 
 print('==> Preparing data..')
@@ -153,8 +145,6 @@ if __name__ == '__main__':
                                 lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     ### validation code ###
     if args.evaluate:
-        #for a_model in model_list:
-            #validate(val_loader, a_model, criterion, args)
         validate(val_loader, model, criterion, args)
         exit()
     #prune_history.append(None)
@@ -259,12 +249,12 @@ if __name__ == '__main__':
         data['rem_total_param'].append(total_params)
         data['rem_trainable_param'].append(total_trainable_params)
         df=DataFrame.from_dict(data, orient='index')
-        df.to_excel('prune_result.xlsx')
+        #df.to_excel('prune_result.xlsx')
         ###
         prev_holdout_error = best_error
 
-        prune_history.append((pruned_layer, number_pruned))
-        table_costs_history.append(model.total_cost)
+        #prune_history.append((pruned_layer, number_pruned))
+        #table_costs_history.append(model.total_cost)
 
         # evaluate on validation set
         #error_history.append(validate(model, val_loader, criterion, device, memory_leak=True))
@@ -282,16 +272,18 @@ if __name__ == '__main__':
                                     lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
         finetune(model, optimizer, criterion, args.long_term_fine_tune, full_train_loader, "", device)
         #error_history.append(validate(val_loader, model, criterion, args))
+        
         prune_history.append(None)
-        table_costs_history.append(table_costs_history[-1])
+        #table_costs_history.append(table_costs_history[-1])
     print("finish pruning")
     # Save
-    #torch.save(model, 'pruned_model_final.pth')
     
+    torch.save(model, 'pruned_model_final.pth')
+    error=validate(val_loader, model, criterion, args)
     ### record long_term_fine_tune result
-    data['acc1'].append(best_error.cpu().numpy())
+    data['acc1'].append(error.cpu().numpy())
     df=DataFrame.from_dict(data, orient='index')
-    df.to_excel('prune_result.xlsx')
+    #df.to_excel('prune_result.xlsx')
     '''
     filename = os.path.join('checkpoints', f'{args.save_file}.pth')
     torch.save({
