@@ -3,6 +3,9 @@
 code兩份
 1. 最精簡,可以跑的code
 2. 有較多註解的code(註解掉 "可幫助改進剪枝, 但還沒做完的code" )
+*兩份code的readme.txt差不多, 不過clean code有多做一些command line的指令, 以方便做測試
+因時間不足無法整合, 在此說明.
+*clean code有做一些變數名稱的修改(main.py), 程式可讀性較高. 
 
 實驗結果
 1. excel檔

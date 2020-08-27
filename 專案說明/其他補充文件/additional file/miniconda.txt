@@ -1,0 +1,31 @@
+Miniconda
+
+1. Install anaconda
+$> bash Miniconda3-latest-Linux-x86_64.sh
+
+2. Updata conda
+$> conda update --all
+
+3. Create env
+$> conda create -n XXXX python=3.5 tensorflow-gpu=1.10
+conda create -n py35pt10 python=3.5
+
+4. Install TF package
+$> ource activate XXXX 
+$> conda install tensorflow-gpu=1.11
+
+5. Remove non-dependency package
+$> conda clean -p
+$> conda clean -t
+
+6. Remove env
+$> conda remove -n XXXX --all
+
+7. Uninstall anaconda
+$> conda install anaconda-clean
+$> anaconda-clean
+$> rm -rf ~/anaconda3 
+
+8. Check cuda/cudnn version
+python -c 'import tensorflow as tf; print(tf.sysconfig.get_lib() + "/python/_pywrap_tensorflow_internal.so")' | xargs ldd
+
