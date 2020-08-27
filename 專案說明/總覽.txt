@@ -6,7 +6,7 @@ code兩份
 
 實驗結果
 1. excel檔
-2. 跑那個model的code
+2. 跑那個model的code(供參考, 以上面兩份code為準)
 3. model.pth檔
 
 剪枝可改進acc＠1的方向:

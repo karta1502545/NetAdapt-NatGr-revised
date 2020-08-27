@@ -110,7 +110,8 @@ data={
 args = parser.parse_args()
 
 model, full_train_loader, val_loader = main(parser)
-#model = torch.load('pruned_model_final.pth')
+if args.evaluate:
+    model = torch.load('pruned_model_final.pth')
 
 if args.evaluate:
     model_list = []
@@ -268,14 +269,11 @@ if __name__ == '__main__':
         optimizer = torch.optim.SGD([v for v in model.parameters() if v.requires_grad],
                                     lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
         finetune(model, optimizer, criterion, args.long_term_fine_tune, full_train_loader, "", device)
-        #error_history.append(validate(val_loader, model, criterion, args))
-        #prune_history.append(None)
-        #table_costs_history.append(table_costs_history[-1])
     print("finish pruning")
     # Save
     torch.save(model, 'pruned_model_final.pth')
     
     ### record long_term_fine_tune result
-    data['acc1'].append(validate(val_loader, new_model, criterion, args).cpu().numpy())
+    data['acc1'].append(validate(val_loader, model, criterion, args).cpu().numpy())
     df=DataFrame.from_dict(data, orient='index')
-    #df.to_excel('prune_result.xlsx')
+    df.to_excel('prune_result.xlsx')
