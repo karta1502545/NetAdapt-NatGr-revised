@@ -1,4 +1,4 @@
-This is a project I am working on in ITRI during the 2020 summer vacation.
+This is a project I am working on in ITRI in Taiwan during the 2020 summer vacation.
 
 The objective of this project is to combine NetAdapt thesis and some prominent model other than the original one(Wide Residual Net-40-2).
 The task is to reduce numbers of parameters in a model, which can speed up model prediction, while the accuracy doesn't decrease too much.
