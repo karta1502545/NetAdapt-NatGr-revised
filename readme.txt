@@ -16,3 +16,5 @@ Note:
 By far only conv_x_y_1 can be pruned(see in resnet18.py "self.to_prune"). (x=2~5, y=1~2)
 In addition, a layer cannot be pruned to 0 channels since the network structure limitation.
 We can modify the minimum amount (>0) of remaining channels(i.e. filters). (see in resnet18.py "minimum_channel_per_layer")
+
+* More details are available in the powerpoint I provided above.
